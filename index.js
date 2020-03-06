@@ -57,6 +57,7 @@ discord.on('message', (data) => {
         dtos.forEach(([u, v]) => {
           text = text.split(u).join(v);
         });
+        text = text.replace( /<:([a-z0-9\_]+):[0-9]{18}>/gm, ":$1:");
         slack.send(JSON.stringify({
           type: 'message',
           channel: process.env.SCHANNEL,
