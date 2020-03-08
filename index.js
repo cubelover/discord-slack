@@ -86,6 +86,9 @@ function discord_start() {
           }));
         }
         if (t === 'GUILD_CREATE') {
+          d.emojis.forEach(({ name, id }) => {
+            stod.push([`:${name}:`, `<:${name}:${id}>`]);
+          });
           d.members.forEach(({ user, nick }) => {
             const name = nick || user.username;
             dtos.push([`<@!${user.id}>`, `&lt;@!${name}&gt;`]);
