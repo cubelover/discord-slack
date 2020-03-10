@@ -12,23 +12,28 @@ const axios = require('axios').create({
   },
 });
 
-let slackname = {}, stod = [['&lt;', '<'], ['&gt;', '>']], dtos = [];
-axios.get(`https://slack.com/api/users.list?token=${process.env.STOKEN}`).then(({ data }) => {
-  data.members.forEach(({ id, name, profile }) => {
-    nick = profile.display_name || name;
-    slackname[id] = nick;
-    stod.push([`<@${id}>`, `<@!${nick}>`]);
-    dtos.push([`<@!${nick}>`, `<@${id}>`]);
-  });
-});
-
+let slackname = {}, stod = [], dtos = [], ssd = [], sds = [], dsd = [], dds = [];
 let slack, discord;
 
 function slack_start() {
+  axios.get(`https://slack.com/api/users.list?token=${process.env.STOKEN}`).then(({ data }) => {
+    ssd = [['&lt;', '<'], ['&gt;', '>']];
+    sds = [];
+    data.members.forEach(({ id, name, profile }) => {
+      nick = profile.display_name || name;
+      slackname[id] = nick;
+      ssd.push([`<@${id}>`, `<@!${nick}>`]);
+      sds.push([`<@!${nick}>`, `<@${id}>`]);
+    });
+    stod = ssd.concat(dsd);
+    dtos = sds.concat(dds);
+  });
+
   axios.get(`https://slack.com/api/rtm.connect?token=${process.env.STOKEN}`).then(({ data }) => {
     let alive = true, ping;
     slack = new WebSocket(data.url);
     slack.on('open', () => {
+      console.log(new Date().toISOString(), 'slack open');
       ping = setInterval(() => {
         if (!alive) {
           slack.terminate();
@@ -50,10 +55,7 @@ function slack_start() {
             tts: false,
           });
         }
-        if (type === 'pong') {
-          alive = true;
-          console.log(new Date().toISOString(), 'slack pong');
-        }
+        if (type === 'pong') alive = true;
       } catch (err) {
         console.error(err, data);
       }
@@ -86,17 +88,22 @@ function discord_start() {
           }));
         }
         if (t === 'GUILD_CREATE') {
+          dsd = [];
+          dds = [];
           d.emojis.forEach(({ name, id }) => {
-            stod.push([`:${name}:`, `<:${name}:${id}>`]);
+            dsd.push([`:${name}:`, `<:${name}:${id}>`]);
           });
           d.members.forEach(({ user, nick }) => {
             const name = nick || user.username;
-            dtos.push([`<@!${user.id}>`, `&lt;@!${name}&gt;`]);
-            stod.push([`<@!${name}>`, `<@!${user.id}>`]);
+            dds.push([`<@!${user.id}>`, `&lt;@!${name}&gt;`]);
+            dsd.push([`<@!${name}>`, `<@!${user.id}>`]);
           });
+          stod = ssd.concat(dsd);
+          dtos = sds.concat(dds);
         }
       }
       if (op === 10) {
+        console.log(new Date().toISOString(), 'discord open');
         discord.send(JSON.stringify({
           op: 2,
           d: {
@@ -117,10 +124,7 @@ function discord_start() {
           discord.send(JSON.stringify({ op: 1, d: s }));
         }, d.heartbeat_interval);
       }
-      if (op === 11) {
-        alive = true;
-        console.log(new Date().toISOString(), 'discord pong');
-      }
+      if (op === 11) alive = true;
     } catch (err) {
       console.error(err, data);
     }
