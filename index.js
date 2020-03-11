@@ -15,6 +15,32 @@ const axios = require('axios').create({
 let slackname = {}, stod = [], dtos = [], ssd = [], sds = [], dsd = [], dds = [];
 let slack, discord;
 
+const discord_queue = [];
+let discord_awake;
+(async () => {
+  while (true) {
+    await new Promise((resolve) => {
+      discord_awake = resolve;
+    });
+    while (discord_queue.length) {
+      data = discord_queue.shift();
+      while (true) {
+        try {
+          await axios.post(`https://discordapp.com/api/channels/${process.env.DCHANNEL}/messages`, data);
+          break;
+        } catch (err) {
+          if (err.response.status === 429) {
+            await new Promise(resolve => setTimeout(resolve, err.response.data.retry_after));
+          }
+          else {
+            console.error(err);
+          }
+        }
+      }
+    }
+  }
+})();
+
 function slack_start() {
   axios.get(`https://slack.com/api/users.list?token=${process.env.STOKEN}`).then(({ data }) => {
     ssd = [['&lt;', '<'], ['&gt;', '>']];
@@ -50,10 +76,8 @@ function slack_start() {
           stod.forEach(([u, v]) => {
             text = text.split(u).join(v);
           });
-          axios.post(`https://discordapp.com/api/channels/${process.env.DCHANNEL}/messages`, {
-            content: `<${slackname[user]}> ${text}`,
-            tts: false,
-          });
+          discord_queue.push({ content: `<${slackname[user]}> ${text}` });
+          discord_awake();
         }
         if (type === 'pong') alive = true;
       } catch (err) {
