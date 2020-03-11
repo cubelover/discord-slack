@@ -135,8 +135,9 @@ function discord_start() {
           });
           d.members.forEach(({ user, nick }) => {
             const name = nick || user.username;
+            dds.push([`<@${user.id}>`, `&lt;@!${name}&gt;`]);
             dds.push([`<@!${user.id}>`, `&lt;@!${name}&gt;`]);
-            dsd.push([`<@!${name}>`, `<@!${user.id}>`]);
+            dsd.push([`<@!${name}>`, `<@${user.id}>`]);
           });
           stod = ssd.concat(dsd);
           dtos = sds.concat(dds);
