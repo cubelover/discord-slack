@@ -1,8 +1,8 @@
 require('dotenv').config();
 const WebSocket = require('ws');
-const qs = require('querystring');
 const http = require('http');
 const https = require('https');
+const FormData = require('form-data');
 const axios = require('axios').create({
   httpAgent: new http.Agent({ keepAlive: true }),
   httpsAgent: new https.Agent({ keepAlive: true }),
@@ -26,7 +26,7 @@ let discord_awake;
       data = discord_queue.shift();
       while (true) {
         try {
-          await axios.post(`https://discordapp.com/api/channels/${process.env.DCHANNEL}/messages`, data);
+          await axios.post(`https://discordapp.com/api/channels/${process.env.DCHANNEL}/messages`, data, { headers: data.getHeaders() });
           break;
         } catch (err) {
           if (err.response.status === 429) {
@@ -71,13 +71,29 @@ function slack_start() {
     });
     slack.on('message', (data) => {
       try {
-        let { type, subtype, channel, user, text } = JSON.parse(data);
+        let { type, subtype, channel, user, text, files } = JSON.parse(data);
         if (type === 'message' && !subtype && channel === process.env.SCHANNEL) {
           stod.forEach(([u, v]) => {
             text = text.split(u).join(v);
           });
-          discord_queue.push({ content: `<${slackname[user]}> ${text}` });
-          discord_awake();
+          const content = `<${slackname[user]}> ${text}`;
+          if (!files) {
+            const fd = new FormData();
+            fd.append('content', content);
+            discord_queue.push(fd);
+            discord_awake();
+          }
+          else {
+            files.forEach((file) => {
+              axios.get(file.url_private, { responseType: 'stream' }).then(({ data }) => {
+                const fd = new FormData();
+                fd.append('content', content);
+                fd.append('file', data, file.title);
+                discord_queue.push(fd);
+                discord_awake();
+              });
+            });
+          }
         }
         if (type === 'pong') alive = true;
       } catch (err) {
