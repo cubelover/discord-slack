@@ -1,5 +1,6 @@
 require('dotenv').config();
 const WebSocket = require('ws');
+const qs = require('querystring');
 const http = require('http');
 const https = require('https');
 const FormData = require('form-data');
@@ -120,11 +121,10 @@ function discord_start() {
           dtos.forEach(([u, v]) => {
             text = text.split(u).join(v);
           });
-          text = text.replace( /<:([a-z0-9\_]+):[0-9]{18}>/gm, ":$1:");
           slack.send(JSON.stringify({
             type: 'message',
             channel: process.env.SCHANNEL,
-            text: `<${d.member.nick || d.author.username}> ${text}`,
+            text: [`<${d.member.nick || d.author.username}> ${text.replace( /<:([a-z0-9\_]+):[0-9]{18}>/gm, ":$1:")}`, ...d.attachments.map(({ url }) => url)].join('\n'),
           }));
         }
         if (t === 'GUILD_CREATE') {
