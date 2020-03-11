@@ -11,6 +11,8 @@ const axios = require('axios').create({
     authorization: `Bot ${process.env.DTOKEN}`,
     cookie: process.env.COOKIE,
   },
+  maxContentLength: Infinity,
+  maxBodyLength: Infinity,
 });
 
 let slackname = {}, stod = [], dtos = [], ssd = [], sds = [], dsd = [], dds = [];
@@ -27,10 +29,12 @@ let discord_awake;
       data = discord_queue.shift();
       while (true) {
         try {
-          await axios.post(`https://discordapp.com/api/channels/${process.env.DCHANNEL}/messages`, data, { headers: data.getHeaders() });
+          const fd = new FormData();
+          data.forEach(e => fd.append(...e));
+          await axios.post(`https://discordapp.com/api/channels/${process.env.DCHANNEL}/messages`, fd, { headers: fd.getHeaders() });
           break;
         } catch (err) {
-          if (err.response.status === 429) {
+          if (err.response && err.response.status === 429) {
             await new Promise(resolve => setTimeout(resolve, err.response.data.retry_after));
           }
           else {
@@ -79,20 +83,21 @@ function slack_start() {
           });
           const content = `<${slackname[user]}> ${text}`;
           if (!files) {
-            const fd = new FormData();
-            fd.append('content', content);
-            discord_queue.push(fd);
+            discord_queue.push([['content', content]]);
             discord_awake();
           }
           else {
             files.forEach((file) => {
-              axios.get(file.url_private, { responseType: 'stream' }).then(({ data }) => {
-                const fd = new FormData();
-                fd.append('content', content);
-                fd.append('file', data, file.title);
-                discord_queue.push(fd);
+              if (file.size > +process.env.LIMIT) {
+                discord_queue.push([['content', `${content}\n${file.url_private}`]]);
                 discord_awake();
-              });
+              }
+              else {
+                axios.get(file.url_private, { responseType: 'stream' }).then(({ data }) => {
+                  discord_queue.push([['content', content], ['file', data, file.title]]);
+                  discord_awake();
+                });
+              }
             });
           }
         }
