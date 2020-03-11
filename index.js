@@ -62,7 +62,7 @@ function slack_start() {
     });
     slack.on('close', () => {
       clearInterval(ping);
-      slack_start();
+      setTimeout(slack_start, 10000);
     });
   });
 }
@@ -131,7 +131,7 @@ function discord_start() {
   });
   discord.on('close', () => {
     clearInterval(ping);
-    discord_start();
+    setTimeout(discord_start, 10000);
   });
 }
 
