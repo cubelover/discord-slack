@@ -16,7 +16,14 @@ const axios = require('axios').create({
 });
 
 let slackname = {}, stod = [], dtos = [], ssd = [], sds = [], dsd = [], dds = [];
+let recent = new Array(1000), ri = 0;
 let slack, discord;
+
+function append(data) {
+  if (ri == recent.length) ri = 0;
+  recent[ri] = data;
+  ri += 1;
+}
 
 const discord_queue = [];
 let discord_awake;
@@ -26,12 +33,13 @@ let discord_awake;
       discord_awake = resolve;
     });
     while (discord_queue.length) {
-      data = discord_queue.shift();
+      const [ts, ...data] = discord_queue.shift();
       while (true) {
         try {
           const fd = new FormData();
           data.forEach(e => fd.append(...e));
-          await axios.post(`https://discordapp.com/api/channels/${process.env.DCHANNEL}/messages`, fd, { headers: fd.getHeaders() });
+          const { id } = (await axios.post(`https://discordapp.com/api/channels/${process.env.DCHANNEL}/messages`, fd, { headers: fd.getHeaders() })).data;
+          append([ts, id]);
           break;
         } catch (err) {
           if (err.response && err.response.status === 429) {
@@ -76,29 +84,43 @@ function slack_start() {
     });
     slack.on('message', (data) => {
       try {
-        let { type, subtype, channel, user, text, files } = JSON.parse(data);
-        if (type === 'message' && !subtype && channel === process.env.SCHANNEL) {
+        let { ok, reply_to, type, subtype, channel, user, text, files, message, ts } = JSON.parse(data);
+        if (ok) append([ts, reply_to]);
+        if (type === 'message' && channel === process.env.SCHANNEL && (!subtype || subtype === 'message_changed')) {
+          if (subtype) {
+            ({ user, text, ts } = message);
+            if (user === process.env.SUSER) return;
+          }
           stod.forEach(([u, v]) => {
             text = text.split(u).join(v);
           });
           const content = `<${slackname[user]}> ${text}`;
-          if (!files) {
-            discord_queue.push([['content', content]]);
-            discord_awake();
+          if (!subtype) {
+            if (!files) {
+              discord_queue.push([ts, ['content', content]]);
+              discord_awake();
+            }
+            else {
+              files.forEach((file) => {
+                if (file.size > +process.env.LIMIT) {
+                  discord_queue.push([ts, ['content', `${content}\n${file.url_private}`]]);
+                  discord_awake();
+                }
+                else {
+                  axios.get(file.url_private, { responseType: 'stream' }).then(({ data }) => {
+                    discord_queue.push([ts, ['content', content], ['file', data, file.title]]);
+                    discord_awake();
+                  });
+                }
+              });
+            }
           }
           else {
-            files.forEach((file) => {
-              if (file.size > +process.env.LIMIT) {
-                discord_queue.push([['content', `${content}\n${file.url_private}`]]);
-                discord_awake();
-              }
-              else {
-                axios.get(file.url_private, { responseType: 'stream' }).then(({ data }) => {
-                  discord_queue.push([['content', content], ['file', data, file.title]]);
-                  discord_awake();
-                });
-              }
-            });
+            const p = recent.find(e => e && e[0] === ts);
+            if (p) {
+              const [, id] = p;
+              axios.patch(`https://discordapp.com/api/channels/${process.env.DCHANNEL}/messages/${id}`, { content });
+            }
           }
         }
         if (type === 'pong') alive = true;
@@ -114,6 +136,7 @@ function slack_start() {
 }
 
 function discord_start() {
+  const msg = new Set(['MESSAGE_CREATE', 'MESSAGE_UPDATE', 'MESSAGE_DELETE']);
   let last_s, alive = true, ping;
   discord = new WebSocket('wss://gateway.discord.gg/?v=6&encoding=json');
   discord.on('message', (data) => {
@@ -121,16 +144,39 @@ function discord_start() {
       let { op, d, s, t } = JSON.parse(data);
       last_s = s;
       if (op === 0) {
-        if (t === 'MESSAGE_CREATE' && d.channel_id == process.env.DCHANNEL && !d.author.bot) {
-          let text = d.content;
-          dtos.forEach(([u, v]) => {
-            text = text.split(u).join(v);
-          });
-          slack.send(JSON.stringify({
-            type: 'message',
-            channel: process.env.SCHANNEL,
-            text: [`<${d.member.nick || d.author.username}> ${text.replace( /<:([a-z0-9\_]+):[0-9]{18}>/gm, ":$1:")}`, ...d.attachments.map(({ url }) => url)].join('\n'),
-          }));
+        if (d.channel_id == process.env.DCHANNEL && (!d.author || !d.author.bot) && msg.has(t)) {
+          const { id } = d;
+          let text;
+          if (t === 'MESSAGE_DELETE') {
+            text = '<>';
+          }
+          else {
+            text = d.content;
+            dtos.forEach(([u, v]) => {
+              text = text.split(u).join(v);
+            });
+            text = [`<${d.member.nick || d.author.username}> ${text.replace( /<:([a-z0-9\_]+):[0-9]{18}>/gm, ":$1:")}`, ...d.attachments.map(({ url }) => url)].join('\n');
+          }
+          if (t === 'MESSAGE_CREATE') {
+            slack.send(JSON.stringify({
+              id,
+              type: 'message',
+              channel: process.env.SCHANNEL,
+              text,
+            }));
+          }
+          else {
+            const p = recent.find(e => e && e[1] === id);
+            if (p) {
+              const [ts] = p;
+              axios.post(`https://slack.com/api/chat.update`, qs.stringify({
+                token: process.env.STOKEN,
+                channel: process.env.SCHANNEL,
+                text,
+                ts,
+              }));
+            }
+          }
         }
         if (t === 'GUILD_CREATE') {
           dsd = [];
