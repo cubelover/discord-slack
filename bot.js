@@ -80,7 +80,7 @@ const commandHandler = {
     bluffRound(res);
   },
   '!bet': (res, who, ...args) => {
-    if (!bluff.state || who !== bluff.pp[0][0]) return;
+    if (!bluff.state || who !== bluff.pp[0][0] || args.length !== 2) return;
     const x = +args[0] | 0, y = +args[1] | 0;
     if (x < 1 || x > 6 || y < 1) return;
     const [, tx, ty] = bluff.last || [0, 0, 0];
@@ -89,8 +89,8 @@ const commandHandler = {
     bluff.last = [who, x, y];
     CM(res, `${users[who]}의 베팅: ${x}${'이가'[52 >> x & 1]} ${y}개, ${users[bluff.pp[0][0]]}의 차례`);
   },
-  '!bluff': (res, who) => {
-    if (!bluff.state || who !== bluff.pp[0][0] || !bluff.last) return;
+  '!bluff': (res, who, ...args) => {
+    if (!bluff.state || who !== bluff.pp[0][0] || !bluff.last || args.length !== 0) return;
     const [tw, tx, ty] = bluff.last;
     delete bluff.last;
     const cnt = Object.values(bluff.dice).reduce((s, e) => e.reduce((s, t) => s + (t === 6 || t === tx), s), 0);
