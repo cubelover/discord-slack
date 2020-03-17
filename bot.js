@@ -1,3 +1,5 @@
+const crypto = require('crypto');
+
 const axios = require('./axios');
 
 const users = {};
@@ -47,6 +49,13 @@ function emojify(num) {
   return num;
 }
 
+function random(n) {
+  const m = 256 / n | 0;
+  while (true) {
+    const t = crypto.randomBytes(1)[0] / m | 0;
+    if (t < n) return t;
+  }
+}
 
 const bluff = {
   state: 0,
@@ -60,11 +69,12 @@ function bluffRound(res) {
     bluff.pp = [];
     return;
   }
-  CM(res, `라운드 시작! ${users[bluff.pp[0][0]]}의 차례 (${bluff.pp.map(([x, y]) => `${users[x]}: ${y}`).join(', ')})`);
+  CM(res, `라운드 시작! ${users[bluff.pp[0][0]]}의 차례 (${bluff.pp.map(([x, y]) => `${users[x]}: ${y}`).join(', ')}, 총 ${bluff.pp.reduce((s, [, t]) => s + t, 0)}개)`);
   bluff.dice = {};
   bluff.pp.forEach(([x, y]) => {
     const d = bluff.dice[x] = [];
-    for (let i = 0; i < y; i += 1) d.push((Math.random() * 6 | 0) + 1);
+    for (let i = 0; i < y; i += 1) d.push(random(6) + 1);
+    d.sort();
     DM(res, x, d.map(emojify).join(' '));
   });
 }
@@ -79,7 +89,7 @@ const commandHandler = {
   '!start': (res, who) => {
     if (bluff.state || !bluff.pp.includes(who)) return;
     for (let i = 1; i < bluff.pp.length; i += 1) {
-      const j = Math.random() * (i + 1) | 0;
+      const j = random(i + 1);
       const t = bluff.pp[i];
       bluff.pp[i] = bluff.pp[j];
       bluff.pp[j] = t;
