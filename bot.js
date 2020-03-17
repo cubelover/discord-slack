@@ -79,11 +79,11 @@ const commandHandler = {
         bluffRound(res);
       }
       if (cmd === 'bet') {
-        bluff.pp.push(bluff.pp.shift());
         const x = +args[0] | 0, y = +args[1] | 0;
         if (x >= 1 && x <= 6 && y >= 1) {
           const [, tx, ty] = bluff.last || [0, 0, 0];
           if ((x === 6 ? y + y - 1 : y) * 10 + x > (tx === 6 ? ty + ty - 1 : ty) * 10 + tx) {
+            bluff.pp.push(bluff.pp.shift());
             bluff.last = [who, x, y];
             CM(res, `${users[who]}의 베팅: ${x}${'이가'[52 >> x & 1]} ${y}개, ${users[bluff.pp[0][0]]}의 차례`);
             return;
