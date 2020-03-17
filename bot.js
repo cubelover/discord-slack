@@ -42,13 +42,9 @@ function CM(res, what) {
 
 
 function emojify(num) {
-  if(num == 1) return ":one:";
-  else if(num == 2) return ":two:";
-  else if(num == 3) return ":three:";
-  else if(num == 4) return ":four:";
-  else if(num == 5) return ":five:";
-  else if(num == 6) return ":star:";
-  else return num;
+  const inum = num | 0;
+  if (1 <= inum && inum <= 6) return [":one:", ":two:", ":three:", ":four:", ":five:", ":star:"][inum-1];
+  return num;
 }
 
 
