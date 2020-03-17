@@ -40,6 +40,14 @@ function CM(res, what) {
   res.discord.send(process.env.DCHANNEL, what);
 }
 
+
+function emojify(num) {
+  const inum = num | 0;
+  if (1 <= inum && inum <= 6) return [":one:", ":two:", ":three:", ":four:", ":five:", ":star:"][inum-1];
+  return num;
+}
+
+
 const bluff = {
   state: 0,
   pp: [],
@@ -57,9 +65,10 @@ function bluffRound(res) {
   bluff.pp.forEach(([x, y]) => {
     const d = bluff.dice[x] = [];
     for (let i = 0; i < y; i += 1) d.push((Math.random() * 6 | 0) + 1);
-    DM(res, x, d.join(' '));
+    DM(res, x, d.map(emojfiy).join(' '));
   });
 }
+
 
 const commandHandler = {
   '!join': (res, who) => {
@@ -87,14 +96,14 @@ const commandHandler = {
     if ((x === 6 ? y + y - 1 : y) * 10 + x <= (tx === 6 ? ty + ty - 1 : ty) * 10 + tx) return;
     bluff.pp.push(bluff.pp.shift());
     bluff.last = [who, x, y];
-    CM(res, `${users[who]}의 베팅: ${x}${'이가'[52 >> x & 1]} ${y}개, ${users[bluff.pp[0][0]]}의 차례`);
+    CM(res, `${users[who]}의 베팅: ${emojify(x)}${'이가'[52 >> x & 1]} ${y}개, ${users[bluff.pp[0][0]]}의 차례`);
   },
   '!bluff': (res, who, ...args) => {
     if (!bluff.state || who !== bluff.pp[0][0] || !bluff.last || args.length !== 0) return;
     const [tw, tx, ty] = bluff.last;
     delete bluff.last;
     const cnt = Object.values(bluff.dice).reduce((s, e) => e.reduce((s, t) => s + (t === 6 || t === tx), s), 0);
-    const text = `${users[who]}의 도전: ${tx}${'이가'[52 >> tx & 1]} ${cnt}개 (차이: ${ty - cnt})\n${bluff.pp.map(([e]) => `${users[e]}: ${bluff.dice[e].join(' ')}`).join('\n')}`;
+    const text = `${users[who]}의 도전: ${emojify(tx)}${'이가'[52 >> tx & 1]} ${cnt}개 (차이: ${ty - cnt})\n${bluff.pp.map(([e]) => `${users[e]}: ${bluff.dice[e].map(emojfiy).join(' ')}`).join('\n')}`;
     if (ty < cnt) bluff.pp.find(([e]) => e === who)[1] -= cnt - ty;
     else if (ty > cnt) bluff.pp.find(([e]) => e === tw)[1] -= ty - cnt;
     else bluff.pp.forEach((e) => {
