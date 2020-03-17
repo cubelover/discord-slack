@@ -43,7 +43,7 @@ function CM(res, what) {
 
 function emojify(num) {
   const inum = num | 0;
-  if (1 <= inum && inum <= 6) return [":one:", ":two:", ":three:", ":four:", ":five:", ":star:"][inum-1];
+  if (1 <= inum && inum <= 6) return [':one:', ':two:', ':three:', ':four:', ':five:', ':star:'][inum-1];
   return num;
 }
 
@@ -103,7 +103,7 @@ const commandHandler = {
     const [tw, tx, ty] = bluff.last;
     delete bluff.last;
     const cnt = Object.values(bluff.dice).reduce((s, e) => e.reduce((s, t) => s + (t === 6 || t === tx), s), 0);
-    const text = `${users[who]}의 도전: ${emojify(tx)}${'이가'[52 >> tx & 1]} ${cnt}개 (차이: ${ty - cnt})\n${bluff.pp.map(([e]) => `${users[e]}: ${bluff.dice[e].map(emojfiy).join(' ')}`).join('\n')}`;
+    const text = `${users[who]}의 도전: ${emojify(tx)}${'이가'[52 >> tx & 1]} ${cnt}개 (차이: ${ty - cnt})\n${bluff.pp.map(([e]) => `${users[e]}: ${bluff.dice[e].map(emojify).join(' ')}`).join('\n')}`;
     if (ty < cnt) bluff.pp.find(([e]) => e === who)[1] -= cnt - ty;
     else if (ty > cnt) bluff.pp.find(([e]) => e === tw)[1] -= ty - cnt;
     else bluff.pp.forEach((e) => {
