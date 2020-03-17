@@ -1,26 +1,31 @@
 require('dotenv').config();
 const WebSocket = require('ws');
 const qs = require('querystring');
-const http = require('http');
-const https = require('https');
 const FormData = require('form-data');
-const axios = require('axios').create({
-  httpAgent: new http.Agent({ keepAlive: true }),
-  httpsAgent: new https.Agent({ keepAlive: true }),
-  headers: {
-    authorization: `Bot ${process.env.DTOKEN}`,
-    cookie: process.env.COOKIE,
-  },
-  maxContentLength: Infinity,
-  maxBodyLength: Infinity,
-});
+
+const axios = require('./axios');
+const bot = require('./bot');
 
 let slackname = {}, stod = [], dtos = [], ssd = [], sds = [], dsd = [], dds = [];
 let recent = new Array(1000), ri = 0;
 let slack, discord;
 
+const res = {
+  slack: {
+    send: (channel, text) => slack.send(JSON.stringify({
+      id: 0,
+      type: 'message',
+      channel,
+      text,
+    })),
+  },
+  discord: {
+    send: (channel, content) => axios.post(`https://discordapp.com/api/channels/${channel}/messages`, { content }),
+  },
+};
+
 function append(data) {
-  if (ri == recent.length) ri = 0;
+  if (ri === recent.length) ri = 0;
   recent[ri] = data;
   ri += 1;
 }
@@ -66,7 +71,10 @@ function slack_start() {
     });
     stod = ssd.concat(dsd);
     dtos = sds.concat(dds);
+    bot.signal('slack.userlist', data.members);
   });
+
+  axios.get(`https://slack.com/api/im.list?token=${process.env.STOKEN}`).then(({ data }) => bot.signal('slack.imlist', data.ims));
 
   axios.get(`https://slack.com/api/rtm.connect?token=${process.env.STOKEN}`).then(({ data }) => {
     let alive = true, ping;
@@ -99,6 +107,7 @@ function slack_start() {
             if (!files) {
               discord_queue.push([ts, ['content', content]]);
               discord_awake();
+              if (text[0] === '!') bot.run(res, user, ...text.split(/\s+/))
             }
             else {
               files.forEach((file) => {
@@ -137,18 +146,20 @@ function slack_start() {
 
 function discord_start() {
   const msg = new Set(['MESSAGE_CREATE', 'MESSAGE_UPDATE', 'MESSAGE_DELETE']);
-  let last_s, alive = true, ping;
+  let alive = true, ping;
   discord = new WebSocket('wss://gateway.discord.gg/?v=6&encoding=json');
   discord.on('message', (data) => {
     try {
       let { op, d, s, t } = JSON.parse(data);
-      last_s = s;
       if (op === 0) {
-        if (d.channel_id == process.env.DCHANNEL && (!d.author || !d.author.bot) && msg.has(t)) {
+        if (d.channel_id === process.env.DCHANNEL && (!d.author || !d.author.bot) && msg.has(t)) {
           const { id } = d;
           let text;
           if (t === 'MESSAGE_DELETE') {
             text = '<>';
+          }
+          else if (!('content' in d)) {
+            return;
           }
           else {
             text = d.content;
@@ -164,6 +175,7 @@ function discord_start() {
               channel: process.env.SCHANNEL,
               text,
             }));
+            if (d.content[0] === '!') bot.run(res, d.author.id, ...d.content.split(/\s+/));
           }
           else {
             const p = recent.find(e => e && e[1] === id);
@@ -192,6 +204,7 @@ function discord_start() {
           });
           stod = ssd.concat(dsd);
           dtos = sds.concat(dds);
+          bot.signal('discord.userlist', d.members);
         }
       }
       if (op === 10) {
