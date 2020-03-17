@@ -65,7 +65,7 @@ function bluffRound(res) {
   bluff.pp.forEach(([x, y]) => {
     const d = bluff.dice[x] = [];
     for (let i = 0; i < y; i += 1) d.push((Math.random() * 6 | 0) + 1);
-    DM(res, x, d.map(emojfiy).join(' '));
+    DM(res, x, d.map(emojify).join(' '));
   });
 }
 
