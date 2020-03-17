@@ -57,19 +57,30 @@ function random(n) {
   }
 }
 
+function mention(u) {
+  return u[0] === 'U'
+    ? { slack: `<@${u}>`, discord: `<@!${users[u]}>` }
+    : { slack: `&lt;@!${users[u]}&gt;`, discord: `<@${u}>` };
+}
+
 const bluff = {
   state: 0,
   pp: [],
 };
+
 function bluffRound(res) {
   bluff.pp = bluff.pp.filter(([x, y]) => y > 0);
   if (bluff.pp.length < 2) {
-    CM(res, `승자: ${users[bluff.pp[0][0]]}`);
+    const u = mention(bluff.pp[0][0]);
+    res.slack.send(process.env.SCHANNEL, `승자: ${u.slack}`);
+    res.discord.send(process.env.DCHANNEL, `승자: ${u.discord}`);
     bluff.state = 0;
     bluff.pp = [];
     return;
   }
-  CM(res, `라운드 시작! ${users[bluff.pp[0][0]]}의 차례 (${bluff.pp.map(([x, y]) => `${users[x]}: ${y}`).join(', ')}, 총 ${bluff.pp.reduce((s, [, t]) => s + t, 0)}개)`);
+  const u = mention(bluff.pp[0][0]);
+  res.slack.send(process.env.SCHANNEL, `라운드 시작! ${u.slack}의 차례 (${bluff.pp.map(([x, y]) => `${users[x]}: ${y}`).join(', ')}, 총 ${bluff.pp.reduce((s, [, t]) => s + t, 0)}개)`);
+  res.discord.send(process.env.DCHANNEL, `라운드 시작! ${u.discord}의 차례 (${bluff.pp.map(([x, y]) => `${users[x]}: ${y}`).join(', ')}, 총 ${bluff.pp.reduce((s, [, t]) => s + t, 0)}개)`);
   bluff.dice = {};
   bluff.pp.forEach(([x, y]) => {
     const d = bluff.dice[x] = [];
@@ -78,7 +89,6 @@ function bluffRound(res) {
     DM(res, x, d.map(emojify).join(' '));
   });
 }
-
 
 const commandHandler = {
   '!join': (res, who) => {
@@ -106,7 +116,9 @@ const commandHandler = {
     if ((x === 6 ? y + y - 1 : y) * 10 + x <= (tx === 6 ? ty + ty - 1 : ty) * 10 + tx) return;
     bluff.pp.push(bluff.pp.shift());
     bluff.last = [who, x, y];
-    CM(res, `${users[who]}의 베팅: ${emojify(x)}${'이가'[52 >> x & 1]} ${y}개, ${users[bluff.pp[0][0]]}의 차례`);
+    const u = mention(bluff.pp[0][0]);
+    res.slack.send(process.env.SCHANNEL, `${users[who]}의 베팅: ${emojify(x)}${'이가'[52 >> x & 1]} ${y}개, ${u.slack}의 차례`);
+    res.discord.send(process.env.DCHANNEL, `${users[who]}의 베팅: ${emojify(x)}${'이가'[52 >> x & 1]} ${y}개, ${u.discord}의 차례`);
   },
   '!bluff': (res, who, ...args) => {
     if (!bluff.state || who !== bluff.pp[0][0] || !bluff.last || args.length !== 0) return;
